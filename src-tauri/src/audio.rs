@@ -225,8 +225,43 @@ impl AudioRecorder {
             duration_secs
         );
 
-        let wav_data = self.encode_wav(&samples, sample_rate)?;
+        // Resample to 16kHz for Whisper compatibility and smaller size
+        let target_rate = 16000;
+        let resampled = self.resample(&samples, sample_rate, target_rate);
+        println!(
+            "[Audio] Resampled to {}Hz. New sample count: {}",
+            target_rate,
+            resampled.len()
+        );
+
+        let wav_data = self.encode_wav(&resampled, target_rate)?;
         Ok(wav_data)
+    }
+
+    fn resample(&self, samples: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
+        if from_rate == to_rate {
+            return samples.to_vec();
+        }
+
+        let ratio = from_rate as f32 / to_rate as f32;
+        let new_len = (samples.len() as f32 / ratio).ceil() as usize;
+        let mut new_samples = Vec::with_capacity(new_len);
+
+        for i in 0..new_len {
+            let src_idx = i as f32 * ratio;
+            let idx_floor = src_idx.floor() as usize;
+            let idx_ceil = (idx_floor + 1).min(samples.len() - 1);
+            let weight = src_idx - idx_floor as f32;
+
+            let s1 = samples[idx_floor];
+            let s2 = samples[idx_ceil];
+
+            // Linear interpolation
+            let sample = s1 * (1.0 - weight) + s2 * weight;
+            new_samples.push(sample);
+        }
+
+        new_samples
     }
 
     fn encode_wav(&self, samples: &[f32], sample_rate: u32) -> Result<Vec<u8>> {
