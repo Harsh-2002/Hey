@@ -187,6 +187,8 @@ export function useRecording({ config, onTranscriptionComplete, onError }: UseRe
                             formatted = true;
                         } catch (formatError) {
                             console.warn('Formatting failed, using raw transcript:', formatError);
+                            // Notify user about formatting failure (non-fatal)
+                            onError(`Formatting failed: ${formatError}`);
                         }
                     }
                 }

@@ -8,7 +8,7 @@ const defaultConfig: Config = {
     shortcut: 'CommandOrControl+Shift+Space',
     auto_paste: false,
     format_with_ai: true,
-    openai_formatting_model: 'gpt-4o-mini',
+    openai_formatting_model: 'gpt-4o',
     groq_formatting_model: 'llama-3.1-8b-instant',
     system_prompt: 'You are a transcript formatter. Clean up the following speech-to-text transcript by fixing punctuation, capitalization, and minor errors. Keep the original meaning and words as much as possible. Output only the cleaned text, nothing else.',
     selected_device: null,
