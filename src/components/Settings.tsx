@@ -328,8 +328,8 @@ export function Settings({ config, onSave, onClose }: SettingsProps) {
                                     value={localConfig.openai_formatting_model}
                                     onChange={e => updateField('openai_formatting_model', e.target.value)}
                                 >
-                                    <option value="gpt-4o">GPT-4o</option>
-                                    <option value="gpt-4o-mini">GPT-4o Mini</option>
+                                    <option value="gpt-4o">GPT 4.1 Nano</option>
+                                    <option value="gpt-4o-mini">GPT 4.0 Mini</option>
                                 </select>
                             </div>
 
