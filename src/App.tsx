@@ -87,7 +87,11 @@ function App() {
     try {
       await writeText(transcription.text);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      // Reset to idle state after 2 seconds
+      setTimeout(() => {
+        setCopied(false);
+        setTranscription(null);
+      }, 2000);
     } catch {
       setStatusMessage({ text: 'Copy failed', type: 'error' });
     }
@@ -130,7 +134,10 @@ function App() {
             </button>
 
             {recordingState === 'idle' && !transcription && !statusMessage && (
-              <p className="status-text">Tap to record</p>
+              <div className="status-container">
+                <p className="status-text">Tap to record</p>
+                <p className="status-shortcut">or hold {config?.shortcut.split('+').map(k => k === 'CommandOrControl' ? '⌘' : k === 'Option' ? '⌥' : k).join(' + ')}</p>
+              </div>
             )}
 
             {recordingState === 'recording' && (

@@ -5,17 +5,12 @@ use std::fs;
 use std::path::PathBuf;
 
 /// Session status
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub enum SessionStatus {
-    Pending,   // Audio saved, transcription in progress
+    #[default]
+    Pending, // Audio saved, transcription in progress
     Completed, // Transcription successful
     Failed,    // Transcription failed
-}
-
-impl Default for SessionStatus {
-    fn default() -> Self {
-        SessionStatus::Pending
-    }
 }
 
 /// Session metadata stored in metadata.json
@@ -171,7 +166,7 @@ pub fn list_sessions(limit: usize, offset: usize) -> Result<Vec<Session>> {
         .collect();
 
     // Sort by name (descending = newest first because of date prefix)
-    entries.sort_by(|a, b| b.file_name().cmp(&a.file_name()));
+    entries.sort_by_key(|b| std::cmp::Reverse(b.file_name()));
 
     // Apply pagination
     for entry in entries.into_iter().skip(offset).take(limit) {
@@ -201,7 +196,7 @@ pub fn get_storage_usage() -> Result<u64> {
 }
 
 /// Load a session from a directory
-pub fn load_session(session_dir: &PathBuf) -> Result<Session> {
+pub fn load_session(session_dir: &std::path::Path) -> Result<Session> {
     let metadata_path = session_dir.join("metadata.json");
     let metadata_content = fs::read_to_string(&metadata_path)?;
     let metadata: SessionMetadata = serde_json::from_str(&metadata_content)?;
@@ -275,11 +270,9 @@ pub fn delete_session(session_id: &str) -> Result<()> {
 pub fn clear_all_sessions() -> Result<()> {
     let base_dir = sessions_dir()?;
 
-    for entry in fs::read_dir(&base_dir)? {
-        if let Ok(entry) = entry {
-            if entry.path().is_dir() {
-                let _ = fs::remove_dir_all(entry.path());
-            }
+    for entry in fs::read_dir(&base_dir)?.flatten() {
+        if entry.path().is_dir() {
+            let _ = fs::remove_dir_all(entry.path());
         }
     }
 

@@ -687,8 +687,7 @@ pub fn run() {
                         });
                     } else if id == "quit" {
                         app.exit(0);
-                    } else if id.starts_with("mic_") {
-                        let device_name = &id[4..];
+                    } else if let Some(device_name) = id.strip_prefix("mic_") {
                         let state = app.state::<AppState>();
                         if let Ok(recorder) = state.recorder.lock() {
                             recorder.set_device(Some(device_name.to_string()));
