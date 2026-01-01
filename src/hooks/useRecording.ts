@@ -55,15 +55,15 @@ export function useRecording({ config, onTranscriptionComplete, onError }: UseRe
                 if (monitor) {
                     const screenWidth = monitor.size.width / monitor.scaleFactor;
                     const screenHeight = monitor.size.height / monitor.scaleFactor;
-                    const overlayWidth = 180;
-                    const overlayHeight = 60;
+                    const overlayWidth = 120;
+                    const overlayHeight = 40;
                     const x = Math.round((screenWidth - overlayWidth) / 2);
                     const y = Math.round(screenHeight - overlayHeight - 80); // 80px above dock
                     const pos = new PhysicalPosition(x * monitor.scaleFactor, y * monitor.scaleFactor);
                     await overlay.setPosition(pos);
                 }
                 await overlay.show();
-                await overlay.emit('overlay-update', { status: 'recording', duration: 0 });
+                await overlay.emit('overlay-update', { status: 'recording', levels: [0, 0, 0, 0, 0] });
             }
 
             await invoke('start_recording');
@@ -76,7 +76,13 @@ export function useRecording({ config, onTranscriptionComplete, onError }: UseRe
                 // Update overlay with duration
                 const overlay = await getOverlay();
                 if (overlay) {
-                    await overlay.emit('overlay-update', { status: 'recording', duration: durationRef.current });
+                    // Get audio levels and send to overlay
+                    try {
+                        const levels = await invoke<number[]>('get_audio_levels');
+                        await overlay.emit('overlay-update', { status: 'recording', levels: levels.slice(-5) });
+                    } catch {
+                        await overlay.emit('overlay-update', { status: 'recording', levels: [0, 0, 0, 0, 0] });
+                    }
                 }
             }, 1000);
 

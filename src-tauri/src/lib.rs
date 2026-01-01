@@ -11,16 +11,20 @@ use config::Config;
 use sessions::Session;
 use std::sync::Mutex;
 use tauri::{
-    menu::{Menu, MenuItem},
+    menu::{Menu, MenuItem, Submenu, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     image::Image,
     Emitter, Manager, WindowEvent,
 };
+use tauri_plugin_clipboard_manager::ClipboardExt;
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+use tauri_plugin_updater::UpdaterExt;
 use transcription::TranscriptionProvider;
 
 struct AppState {
     recorder: Mutex<AudioRecorder>,
     config: Mutex<Config>,
+    last_transcript: Mutex<Option<String>>,
 }
 
 // ============== Recording Commands ==============
@@ -401,6 +405,7 @@ fn save_pending_session(
 
 #[tauri::command]
 fn update_session_transcript(
+    state: tauri::State<AppState>,
     session_id: String,
     text: String,
     raw_text: Option<String>,
@@ -408,6 +413,13 @@ fn update_session_transcript(
     success: bool,
     error_message: Option<String>,
 ) -> Result<sessions::Session, String> {
+    // Store in last_transcript if successful
+    if success {
+        if let Ok(mut last) = state.last_transcript.lock() {
+            *last = Some(text.clone());
+        }
+    }
+
     sessions::update_session_transcript(
         &session_id,
         &text,
@@ -459,9 +471,12 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec!["--hidden"]),
         ))
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_keyring::init())
         .manage(AppState {
             recorder: Mutex::new(recorder),
             config: Mutex::new(config),
+            last_transcript: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
             // Recording
@@ -501,14 +516,44 @@ pub fn run() {
             save_config,
         ])
         .setup(|app| {
-            // Create tray menu
-            let show = MenuItem::with_id(app, "show", "Show Hey", true, None::<&str>)?;
+            // Get initial audio devices
+            let state = app.state::<AppState>();
+            let mut devices = Vec::new();
+            if let Ok(recorder) = state.recorder.lock() {
+                if let Ok(devs) = recorder.list_devices() {
+                    devices = devs;
+                }
+            }
+
+            // Create tray menu items
+            let show = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
+            let copy = MenuItem::with_id(app, "copy", "Copy Last Transcript", true, None::<&str>)?;
+            let separator = PredefinedMenuItem::separator(app)?;
+            
+            // Microphones submenu
+            let mic_menu = Submenu::new(app, "Microphones", true)?;
+            for device in devices {
+                let id = format!("mic_{}", device.name);
+                let item = MenuItem::with_id(app, &id, &device.name, true, None::<&str>)?;
+                mic_menu.append(&item)?;
+            }
+            
+            let updates = MenuItem::with_id(app, "update", "Check for Updates", true, None::<&str>)?;
             let settings = MenuItem::with_id(app, "settings", "Settings...", true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "quit", "Quit Hey", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
-            let menu = Menu::with_items(app, &[&show, &settings, &quit])?;
+            let menu = Menu::with_items(app, &[
+                &show,
+                &copy,
+                &separator,
+                &mic_menu,
+                &separator, 
+                &updates,
+                &settings, 
+                &quit
+            ])?;
 
-            // Create tray icon - load from app resources
+            // Create tray icon
             let tray_icon_bytes = include_bytes!("../icons/TrayIcon.png");
             let icon_img = image::load_from_memory(tray_icon_bytes)
                 .expect("Failed to load tray icon image")
@@ -521,24 +566,73 @@ pub fn run() {
                 .icon(tray_icon)
                 .menu(&menu)
                 .icon_as_template(true)
-                .on_menu_event(|app, event| match event.id.as_ref() {
-                    "show" => {
+                .on_menu_event(|app, event| {
+                    let id = event.id.as_ref();
+                    if id == "show" {
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.show();
                             let _ = window.set_focus();
                         }
-                    }
-                    "settings" => {
+                    } else if id == "copy" {
+                        let state = app.state::<AppState>();
+                        if let Ok(last) = state.last_transcript.lock() {
+                            if let Some(text) = last.as_ref() {
+                                let _ = app.clipboard().write_text(text);
+                            }
+                        };
+                    } else if id == "settings" {
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.show();
                             let _ = window.set_focus();
                             let _ = window.emit("open-settings", ());
                         }
-                    }
-                    "quit" => {
+                    } else if id == "update" {
+                        let handle = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            match handle.updater() {
+                                Ok(updater) => {
+                                    match updater.check().await {
+                                        Ok(Some(update)) => {
+                                            handle.dialog()
+                                                .message(format!("Version {} is available.", update.version))
+                                                .title("Update Available")
+                                                .kind(MessageDialogKind::Info)
+                                                .show(|_| {});
+                                        }
+                                        Ok(None) => {
+                                            handle.dialog()
+                                                .message("You are on the latest version.")
+                                                .title("No Updates")
+                                                .kind(MessageDialogKind::Info)
+                                                .show(|_| {});
+                                        }
+                                        Err(e) => {
+                                            handle.dialog()
+                                                .message(format!("Error: {}", e))
+                                                .title("Update Check Failed")
+                                                .kind(MessageDialogKind::Error)
+                                                .show(|_| {});
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    handle.dialog()
+                                        .message(format!("Failed to initialize updater: {}", e))
+                                        .title("Updater Error")
+                                        .kind(MessageDialogKind::Error)
+                                        .show(|_| {});
+                                }
+                            }
+                        });
+                    } else if id == "quit" {
                         app.exit(0);
+                    } else if id.starts_with("mic_") {
+                        let device_name = &id[4..];
+                        let state = app.state::<AppState>();
+                        if let Ok(recorder) = state.recorder.lock() {
+                            recorder.set_device(Some(device_name.to_string()));
+                        };
                     }
-                    _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click {

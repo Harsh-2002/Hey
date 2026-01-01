@@ -6,18 +6,18 @@ type OverlayStatus = 'idle' | 'recording' | 'processing';
 
 interface OverlayPayload {
     status: OverlayStatus;
-    duration?: number;
+    levels?: number[];
 }
 
 export function RecordingOverlay() {
     const [status, setStatus] = useState<OverlayStatus>('idle');
-    const [duration, setDuration] = useState(0);
+    const [levels, setLevels] = useState<number[]>([0, 0, 0, 0, 0]);
 
     useEffect(() => {
         const unlisten = listen<OverlayPayload>('overlay-update', (event) => {
             setStatus(event.payload.status);
-            if (event.payload.duration !== undefined) {
-                setDuration(event.payload.duration);
+            if (event.payload.levels) {
+                setLevels(event.payload.levels);
             }
         });
 
@@ -26,12 +26,6 @@ export function RecordingOverlay() {
         };
     }, []);
 
-    const formatDuration = (secs: number) => {
-        const m = Math.floor(secs / 60);
-        const s = secs % 60;
-        return `${m}:${s.toString().padStart(2, '0')}`;
-    };
-
     if (status === 'idle') {
         return null;
     }
@@ -39,10 +33,22 @@ export function RecordingOverlay() {
     return (
         <div className={`overlay-container ${status}`}>
             <div className="overlay-content">
-                <div className="pulse-indicator" />
-                <span className="overlay-text">
-                    {status === 'recording' ? formatDuration(duration) : 'Processing...'}
-                </span>
+                {status === 'recording' ? (
+                    <div className="waveform">
+                        {levels.map((level, i) => (
+                            <div
+                                key={i}
+                                className="waveform-bar"
+                                style={{ height: `${Math.max(4, level * 24)}px` }}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <>
+                        <div className="pulse-indicator" />
+                        <span className="overlay-text">Processing...</span>
+                    </>
+                )}
             </div>
         </div>
     );

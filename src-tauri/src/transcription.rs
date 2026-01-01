@@ -198,8 +198,7 @@ async fn format_with_openai(
                     "role": "user",
                     "content": text
                 }
-            ],
-            "temperature": 0.3
+            ]
         }))
         .send()
         .await?;

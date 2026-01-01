@@ -42,4 +42,7 @@ tauri-plugin-fs = "2.4.4"
 walkdir = "2.3"
 image = "0.25"
 tauri-plugin-autostart = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-keyring = "0.1"
+keyring = "3"
 

@@ -10,30 +10,44 @@
 .overlay-content {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 14px 20px;
+    justify-content: center;
+    gap: 8px;
+    padding: 0;
+    width: 100px;
+    /* Fixed width for consistency */
+    height: 32px;
+    /* Fixed height */
+    overflow: hidden;
+    /* Fix border bleeding */
     background: rgba(30, 30, 30, 0.95);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border-radius: 14px;
+    border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.1);
+    min-width: 80px;
+}
+
+.waveform {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    height: 24px;
+}
+
+.waveform-bar {
+    width: 3px;
+    min-height: 4px;
+    background: #ff3b30;
+    border-radius: 2px;
+    transition: height 0.1s ease-out;
 }
 
 .pulse-indicator {
-    width: 12px;
-    height: 12px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
-    background: #ff3b30;
-    animation: pulse 1.2s ease-in-out infinite;
-}
-
-.recording .pulse-indicator {
-    background: #ff3b30;
-}
-
-.processing .pulse-indicator {
     background: #ff9500;
-    animation: spin 1s linear infinite;
+    animation: pulse 1.2s ease-in-out infinite;
 }
 
 @keyframes pulse {
@@ -50,24 +64,10 @@
     }
 }
 
-@keyframes spin {
-    0% {
-        transform: rotate(0deg);
-    }
-
-    100% {
-        transform: rotate(360deg);
-    }
-}
-
 .overlay-text {
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 500;
-    color: #ffffff;
-    letter-spacing: -0.2px;
-}
-
-.processing .overlay-text {
     color: #ff9500;
+    letter-spacing: -0.2px;
 }

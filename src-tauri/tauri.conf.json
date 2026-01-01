@@ -30,8 +30,8 @@
         "label": "overlay",
         "title": "",
         "url": "overlay.html",
-        "width": 180,
-        "height": 60,
+        "width": 120,
+        "height": 40,
         "resizable": false,
         "decorations": false,
         "transparent": true,
@@ -62,5 +62,13 @@
       "icons/128x128@2x.png",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://gist.githubusercontent.com/user/gist-id/raw/latest.json"
+      ],
+      "pubkey": "YOUR_PUBLIC_KEY_HERE"
+    }
   }
 }

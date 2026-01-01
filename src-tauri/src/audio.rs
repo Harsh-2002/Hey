@@ -160,7 +160,7 @@ impl AudioRecorder {
                     if level_buffer.len() >= level_buffer_size {
                         let peak = level_buffer
                             .iter()
-                            .map(|s| s.abs())
+                            .map(|s| (s * 5.0).abs()) // Amplify for visualization
                             .fold(0.0f32, |a, b| a.max(b));
 
                         let sum_sq: f32 = level_buffer.iter().map(|s| s * s).sum();
