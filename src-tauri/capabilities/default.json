@@ -22,7 +22,10 @@
     "global-shortcut:allow-is-registered",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-write-text",
+    "dialog:allow-ask",
+    "dialog:allow-message",
     "dialog:allow-open",
+    "keyring:allow-set-password",
     {
       "identifier": "fs:allow-read",
       "allow": [

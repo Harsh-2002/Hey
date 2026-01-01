@@ -28,6 +28,7 @@ function App() {
     loading: configLoading,
     hasCompletedOnboarding,
     completeOnboarding,
+    resetOnboarding,
   } = useSettings();
 
   const handleTranscriptionComplete = useCallback((result: TranscriptionResult) => {
@@ -179,7 +180,15 @@ function App() {
       )}
 
       {currentView === 'settings' && config && (
-        <Settings config={config} onSave={saveConfig} onClose={() => setCurrentView('main')} />
+        <Settings
+          config={config}
+          onSave={saveConfig}
+          onClose={() => setCurrentView('main')}
+          onReset={() => {
+            resetOnboarding();
+            window.location.reload();
+          }}
+        />
       )}
 
       {currentView === 'history' && (

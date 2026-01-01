@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
-import { X, Keyboard, Mic, Shield, Check, Loader2, Database, Sparkles } from 'lucide-react';
+import { X, Keyboard, Mic, Shield, Check, Loader2, Database, Sparkles, Trash2, AlertTriangle } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import type { Config, TranscriptionProvider } from '../types';
+import { ask } from '@tauri-apps/plugin-dialog';
 
 interface SettingsProps {
     config: Config;
     onSave: (config: Config) => Promise<boolean>;
     onClose: () => void;
+    onReset?: () => void;
 }
 
 interface AudioDevice {
@@ -26,7 +28,7 @@ const providers: ProviderInfo[] = [
     { id: 'assemblyai', name: 'AssemblyAI', description: 'Feature-rich' },
 ];
 
-export function Settings({ config, onSave, onClose }: SettingsProps) {
+export function Settings({ config, onSave, onClose, onReset }: SettingsProps) {
     const [localConfig, setLocalConfig] = useState<Config>(config);
     const [apiKeys, setApiKeys] = useState<Record<string, string>>({
         openai: '',
@@ -34,6 +36,7 @@ export function Settings({ config, onSave, onClose }: SettingsProps) {
         assemblyai: '',
     });
     const [saving, setSaving] = useState(false);
+    const [resetting, setResetting] = useState(false);
     const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
     const [keysInKeychain, setKeysInKeychain] = useState<Record<string, boolean>>({});
     const [validatingKey, setValidatingKey] = useState<string | null>(null);
@@ -125,6 +128,26 @@ export function Settings({ config, onSave, onClose }: SettingsProps) {
         setSaving(false);
         if (success) {
             onClose();
+        }
+    };
+
+    const handleReset = async () => {
+        const confirmed = await ask('Are you sure you want to delete all data and reset the app? This cannot be undone.', {
+            title: 'Factory Reset',
+            kind: 'warning',
+            okLabel: 'Reset Everything',
+            cancelLabel: 'Cancel'
+        });
+
+        if (confirmed) {
+            setResetting(true);
+            try {
+                await invoke('reset_app_data');
+                onReset?.();
+            } catch (error) {
+                console.error('Reset failed:', error);
+                setResetting(false);
+            }
         }
     };
 
@@ -414,7 +437,28 @@ export function Settings({ config, onSave, onClose }: SettingsProps) {
                     </div>
                 </div>
 
-                {/* Credits */}
+                {/* Danger Zone */}
+                <div className="section danger-zone">
+                    <h3><AlertTriangle size={14} className="danger-icon" /> Danger Zone</h3>
+                    <div className="danger-content">
+                        <p>Resetting the app will delete all your data, including API keys and history. This action cannot be undone.</p>
+                        <button
+                            className="danger-btn"
+                            onClick={handleReset}
+                            disabled={resetting}
+                        >
+                            {resetting ? <Loader2 size={16} className="spinner-icon" /> : <Trash2 size={16} />}
+                            <span>Factory Reset</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Save */}
+                <button className="primary-btn full-width" onClick={handleSave} disabled={saving}>
+                    {saving ? 'Saving...' : 'Save Settings'}
+                </button>
+
+                {/* Credits - at the very bottom */}
                 <div className="section credits-section">
                     <div className="credits-content">
                         <span className="credits-text">Built by </span>
@@ -427,11 +471,6 @@ export function Settings({ config, onSave, onClose }: SettingsProps) {
                         </a>
                     </div>
                 </div>
-
-                {/* Save */}
-                <button className="primary-btn full-width" onClick={handleSave} disabled={saving}>
-                    {saving ? 'Saving...' : 'Save Settings'}
-                </button>
             </div>
         </div>
     );

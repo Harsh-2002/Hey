@@ -57,7 +57,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             active_provider: TranscriptionProvider::OpenAI,
-            shortcut: "CommandOrControl+Shift+Space".to_string(),
+            shortcut: "Option+Space".to_string(),
             auto_paste: false,
             format_with_ai: true,
             openai_formatting_model: default_openai_model(),

@@ -39,14 +39,14 @@ export function RecordingOverlay() {
                             <div
                                 key={i}
                                 className="waveform-bar"
-                                style={{ height: `${Math.max(4, level * 24)}px` }}
+                                style={{ height: `${Math.max(4, Math.min(24, level * 24))}px` }}
                             />
                         ))}
                     </div>
                 ) : (
                     <>
                         <div className="pulse-indicator" />
-                        <span className="overlay-text">Processing...</span>
+                        <span className="overlay-text">Processing</span>
                     </>
                 )}
             </div>

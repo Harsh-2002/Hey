@@ -30,22 +30,25 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                     <div className="app-icon-large">
                         <img src="/128-mac.png" alt="Hey" />
                     </div>
-                    <p className="welcome-text">
-                        Hey transforms your voice into perfectly formatted text.
-                        Just speak, and let AI do the rest.
-                    </p>
-                    <div className="feature-list">
-                        <div className="feature-item">
-                            <CheckCircle2 size={16} />
-                            <span>Record with a single click or shortcut</span>
-                        </div>
-                        <div className="feature-item">
-                            <CheckCircle2 size={16} />
-                            <span>AI-powered transcription & formatting</span>
-                        </div>
-                        <div className="feature-item">
-                            <CheckCircle2 size={16} />
-                            <span>Paste directly to any app</span>
+
+                    <div className="onboarding-card">
+                        <p className="welcome-text">
+                            Hey transforms your voice into perfectly formatted text.
+                            Just speak, and let AI do the rest.
+                        </p>
+                        <div className="feature-list">
+                            <div className="feature-item">
+                                <CheckCircle2 size={16} />
+                                <span>Record with a single click or shortcut</span>
+                            </div>
+                            <div className="feature-item">
+                                <CheckCircle2 size={16} />
+                                <span>AI-powered transcription & formatting</span>
+                            </div>
+                            <div className="feature-item">
+                                <CheckCircle2 size={16} />
+                                <span>Paste directly to any app</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -58,31 +61,21 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             icon: <Shield size={32} />,
             content: (
                 <div className="onboarding-tos">
-                    <div className="tos-scroll">
-                        <h4>Privacy & Data</h4>
-                        <p>
-                            Your audio recordings are sent to your chosen transcription provider
-                            (OpenAI, Groq, or AssemblyAI) for processing. We do not store your
-                            audio or transcriptions on our servers.
-                        </p>
-
-                        <h4>API Keys</h4>
-                        <p>
-                            Your API keys are stored locally on your device in
-                            <code>~/.hey/config.json</code>. They are never transmitted to us.
-                        </p>
-
-                        <h4>Permissions</h4>
-                        <p>
-                            Hey requires microphone access to record audio. For the paste-to-window
-                            feature, Accessibility permission is needed.
-                        </p>
-
-                        <h4>Usage</h4>
-                        <p>
-                            You are responsible for ensuring your use of transcription services
-                            complies with their respective terms of service.
-                        </p>
+                    <div className="onboarding-card">
+                        <div className="feature-list">
+                            <div className="feature-item">
+                                <CheckCircle2 size={16} />
+                                <span><strong>Privacy:</strong> Audio sent to your chosen provider (OpenAI/Groq/AssemblyAI). We don't store your data.</span>
+                            </div>
+                            <div className="feature-item">
+                                <CheckCircle2 size={16} />
+                                <span><strong>API Keys:</strong> Stored securely in your macOS Keychain.</span>
+                            </div>
+                            <div className="feature-item">
+                                <CheckCircle2 size={16} />
+                                <span><strong>Permissions:</strong> Microphone required. Accessibility optional for auto-paste.</span>
+                            </div>
+                        </div>
                     </div>
 
                     <label className="tos-checkbox">
@@ -104,46 +97,39 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             icon: <Keyboard size={32} />,
             content: (
                 <div className="onboarding-shortcuts">
-                    <div className="shortcut-demo">
-                        <div className="shortcut-visual">
-                            <div className="key-combo">
-                                <kbd>⌘</kbd>
-                                <span>+</span>
-                                <kbd>⇧</kbd>
-                                <span>+</span>
-                                <kbd>Space</kbd>
+                    <div className="onboarding-card">
+                        <div className="shortcut-demo">
+                            <div className="shortcut-visual">
+                                <div className="key-combo">
+                                    <kbd>⌥</kbd>
+                                    <span>+</span>
+                                    <kbd>Space</kbd>
+                                </div>
+                                <p className="shortcut-action">Hold to record, release to stop</p>
                             </div>
-                            <p className="shortcut-action">Hold to record, release to stop</p>
                         </div>
-                    </div>
 
-                    <div className="shortcut-tips">
-                        <div className="tip">
-                            <div className="tip-icon">1</div>
-                            <div className="tip-text">
-                                <strong>Hold the shortcut</strong>
-                                <span>Start speaking your message</span>
+                        <div className="shortcut-tips">
+                            <div className="tip">
+                                <div className="tip-icon">1</div>
+                                <div className="tip-text">
+                                    <strong>Hold shortcut</strong>
+                                    <span>Speak your message</span>
+                                </div>
+                            </div>
+                            <div className="tip">
+                                <div className="tip-icon">2</div>
+                                <div className="tip-text">
+                                    <strong>Release</strong>
+                                    <span>AI processes audio</span>
+                                </div>
                             </div>
                         </div>
-                        <div className="tip">
-                            <div className="tip-icon">2</div>
-                            <div className="tip-text">
-                                <strong>Release when done</strong>
-                                <span>AI processes your audio</span>
-                            </div>
-                        </div>
-                        <div className="tip">
-                            <div className="tip-icon">3</div>
-                            <div className="tip-text">
-                                <strong>Text copied automatically</strong>
-                                <span>Ready to paste anywhere</span>
-                            </div>
-                        </div>
-                    </div>
 
-                    <p className="shortcut-note">
-                        💡 You can customize the shortcut in Settings
-                    </p>
+                        <p className="shortcut-note">
+                            💡 Customize in Settings later
+                        </p>
+                    </div>
                 </div>
             ),
         },
@@ -154,35 +140,36 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             icon: <Shield size={32} />,
             content: (
                 <div className="onboarding-permissions">
-                    <div className="permission-item">
-                        <div className="permission-icon">
-                            <Mic size={24} />
+                    <div className="onboarding-card">
+                        <div className="permission-item">
+                            <div className="permission-icon">
+                                <Mic size={24} />
+                            </div>
+                            <div className="permission-info">
+                                <strong>Microphone Access</strong>
+                                <span>Required to record</span>
+                            </div>
+                            <div className="permission-status granted">
+                                <CheckCircle2 size={16} />
+                            </div>
                         </div>
-                        <div className="permission-info">
-                            <strong>Microphone Access</strong>
-                            <span>Required to record your voice</span>
-                        </div>
-                        <div className="permission-status granted">
-                            <CheckCircle2 size={16} />
-                        </div>
-                    </div>
 
-                    <div className="permission-item">
-                        <div className="permission-icon">
-                            <Keyboard size={24} />
-                        </div>
-                        <div className="permission-info">
-                            <strong>Accessibility</strong>
-                            <span>Optional, for paste-to-window feature</span>
-                        </div>
-                        <div className="permission-status optional">
-                            Optional
+                        <div className="permission-item">
+                            <div className="permission-icon">
+                                <Keyboard size={24} />
+                            </div>
+                            <div className="permission-info">
+                                <strong>Accessibility</strong>
+                                <span>Optional (Auto-paste)</span>
+                            </div>
+                            <div className="permission-status optional">
+                                Optional
+                            </div>
                         </div>
                     </div>
 
                     <p className="permission-note">
-                        macOS will prompt you for permissions when needed.
-                        You can change these anytime in System Settings.
+                        Change anytime in System Settings.
                     </p>
                 </div>
             ),

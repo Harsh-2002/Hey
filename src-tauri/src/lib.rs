@@ -25,6 +25,7 @@ struct AppState {
     recorder: Mutex<AudioRecorder>,
     config: Mutex<Config>,
     last_transcript: Mutex<Option<String>>,
+    api_key_cache: Mutex<std::collections::HashMap<String, String>>,
 }
 
 // ============== Recording Commands ==============
@@ -327,18 +328,53 @@ fn paste_to_window() -> Result<(), String> {
 // ============== Secure Storage Commands ==============
 
 #[tauri::command]
-fn store_api_key(provider: String, api_key: String) -> Result<(), String> {
-    keychain::store_api_key(&provider, &api_key).map_err(|e| e.to_string())
+fn store_api_key(
+    state: tauri::State<AppState>,
+    provider: String,
+    api_key: String,
+) -> Result<(), String> {
+    // Store in keychain
+    keychain::store_api_key(&provider, &api_key).map_err(|e| e.to_string())?;
+
+    // Update cache
+    if let Ok(mut cache) = state.api_key_cache.lock() {
+        cache.insert(provider, api_key);
+    }
+    Ok(())
 }
 
 #[tauri::command]
-fn get_api_key(provider: String) -> Result<Option<String>, String> {
-    keychain::get_api_key(&provider).map_err(|e| e.to_string())
+fn get_api_key(state: tauri::State<AppState>, provider: String) -> Result<Option<String>, String> {
+    // Check cache first
+    if let Ok(cache) = state.api_key_cache.lock() {
+        if let Some(key) = cache.get(&provider) {
+            return Ok(Some(key.clone()));
+        }
+    }
+
+    // Fallback to keychain
+    let key = keychain::get_api_key(&provider).map_err(|e| e.to_string())?;
+
+    // Populate cache if found
+    if let Some(ref k) = key {
+        if let Ok(mut cache) = state.api_key_cache.lock() {
+            cache.insert(provider, k.clone());
+        }
+    }
+
+    Ok(key)
 }
 
 #[tauri::command]
-fn delete_api_key(provider: String) -> Result<(), String> {
-    keychain::delete_api_key(&provider).map_err(|e| e.to_string())
+fn delete_api_key(state: tauri::State<AppState>, provider: String) -> Result<(), String> {
+    // Delete from keychain
+    keychain::delete_api_key(&provider).map_err(|e| e.to_string())?;
+
+    // Remove from cache
+    if let Ok(mut cache) = state.api_key_cache.lock() {
+        cache.remove(&provider);
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -451,15 +487,38 @@ fn save_config(state: tauri::State<AppState>, config: Config) -> Result<(), Stri
     current_config.save().map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn reset_app_data(state: tauri::State<AppState>) -> Result<(), String> {
+    // 1. Delete all keys from keychain
+    let _ = keychain::delete_api_key("openai");
+    let _ = keychain::delete_api_key("groq");
+    let _ = keychain::delete_api_key("assemblyai");
+
+    // 2. Clear in-memory cache
+    if let Ok(mut cache) = state.api_key_cache.lock() {
+        cache.clear();
+    }
+
+    // 3. Delete configuration directory (~/.hey)
+    if let Some(home) = dirs::home_dir() {
+        let config_dir = home.join(".hey");
+        if config_dir.exists() {
+            // Remove everything
+            std::fs::remove_dir_all(&config_dir).map_err(|e| e.to_string())?;
+            // Recreate empty dir to avoid crashes if app continues running
+            std::fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
+        }
+    }
+
+    Ok(())
+}
+
 // ============== App Entry Point ==============
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let recorder = AudioRecorder::new().expect("Failed to initialize audio recorder");
     let config = Config::load().unwrap_or_default();
-
-    // Migrate API keys from config to keychain on first run
-    let _ = keychain::migrate_from_config(&config);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -477,6 +536,7 @@ pub fn run() {
             recorder: Mutex::new(recorder),
             config: Mutex::new(config),
             last_transcript: Mutex::new(None),
+            api_key_cache: Mutex::new(std::collections::HashMap::new()),
         })
         .invoke_handler(tauri::generate_handler![
             // Recording
@@ -514,6 +574,7 @@ pub fn run() {
             // Config
             get_config,
             save_config,
+            reset_app_data,
         ])
         .setup(|app| {
             // Get initial audio devices
