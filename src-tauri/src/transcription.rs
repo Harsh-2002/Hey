@@ -268,3 +268,40 @@ async fn parse_chat_response(response: reqwest::Response) -> Result<String> {
         .map(|c| c.message.content.clone())
         .unwrap_or_else(|| String::from("")))
 }
+
+/// Validates an API key by making a lightweight test call to the provider
+pub async fn validate_api_key(provider: TranscriptionProvider, api_key: &str) -> Result<bool> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()?;
+
+    match provider {
+        TranscriptionProvider::OpenAI => {
+            // Call /v1/models - free, no tokens used
+            let response = client
+                .get("https://api.openai.com/v1/models")
+                .header("Authorization", format!("Bearer {}", api_key))
+                .send()
+                .await?;
+            Ok(response.status().is_success())
+        }
+        TranscriptionProvider::Groq => {
+            // Call /v1/models - free
+            let response = client
+                .get("https://api.groq.com/openai/v1/models")
+                .header("Authorization", format!("Bearer {}", api_key))
+                .send()
+                .await?;
+            Ok(response.status().is_success())
+        }
+        TranscriptionProvider::AssemblyAI => {
+            // Call account info endpoint - free
+            let response = client
+                .get("https://api.assemblyai.com/v2/transcript?limit=1")
+                .header("authorization", api_key)
+                .send()
+                .await?;
+            Ok(response.status().is_success())
+        }
+    }
+}

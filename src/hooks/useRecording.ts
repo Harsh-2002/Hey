@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { register, unregister, isRegistered } from '@tauri-apps/plugin-global-shortcut';
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import type { RecordingState, Config, TranscriptionResult } from '../types';
 
 interface UseRecordingProps {
@@ -9,6 +10,9 @@ interface UseRecordingProps {
     onError: (message: string) => void;
 }
 
+// Helper to get overlay window (async because getByLabel returns a Promise)
+const getOverlay = async () => await WebviewWindow.getByLabel('overlay');
+
 export function useRecording({ config, onTranscriptionComplete, onError }: UseRecordingProps) {
     const [recordingState, setRecordingState] = useState<RecordingState>('idle');
     const [duration, setDuration] = useState(0);
@@ -16,6 +20,14 @@ export function useRecording({ config, onTranscriptionComplete, onError }: UseRe
     const timerRef = useRef<number | null>(null);
     const levelIntervalRef = useRef<number | null>(null);
     const shortcutRegistered = useRef<string | null>(null);
+    const registeredModeRef = useRef<string | null>(null);
+    const durationRef = useRef(0);
+    const recordingStateRef = useRef<RecordingState>('idle');
+
+    // Keep ref in sync with state for use in shortcut handler
+    useEffect(() => {
+        recordingStateRef.current = recordingState;
+    }, [recordingState]);
 
     const startRecording = useCallback(async () => {
         if (recordingState !== 'idle') return;
@@ -31,15 +43,41 @@ export function useRecording({ config, onTranscriptionComplete, onError }: UseRe
             // Optimistic UI update
             setRecordingState('recording');
             setDuration(0);
+            durationRef.current = 0;
             setAudioLevels([]);
-            console.log('[Recording] Starting...');
+
+            // Show overlay at bottom-center of screen
+            const overlay = await getOverlay();
+            if (overlay) {
+                // Get screen size and position at bottom-center
+                const { availableMonitors, currentMonitor, PhysicalPosition } = await import('@tauri-apps/api/window');
+                const monitor = await currentMonitor() || (await availableMonitors())[0];
+                if (monitor) {
+                    const screenWidth = monitor.size.width / monitor.scaleFactor;
+                    const screenHeight = monitor.size.height / monitor.scaleFactor;
+                    const overlayWidth = 180;
+                    const overlayHeight = 60;
+                    const x = Math.round((screenWidth - overlayWidth) / 2);
+                    const y = Math.round(screenHeight - overlayHeight - 80); // 80px above dock
+                    const pos = new PhysicalPosition(x * monitor.scaleFactor, y * monitor.scaleFactor);
+                    await overlay.setPosition(pos);
+                }
+                await overlay.show();
+                await overlay.emit('overlay-update', { status: 'recording', duration: 0 });
+            }
 
             await invoke('start_recording');
             console.log('[Recording] Started successfully');
 
             // Duration timer
-            timerRef.current = window.setInterval(() => {
-                setDuration(d => d + 1);
+            timerRef.current = window.setInterval(async () => {
+                durationRef.current += 1;
+                setDuration(durationRef.current);
+                // Update overlay with duration
+                const overlay = await getOverlay();
+                if (overlay) {
+                    await overlay.emit('overlay-update', { status: 'recording', duration: durationRef.current });
+                }
             }, 1000);
 
             // Audio levels polling for waveform
@@ -54,6 +92,9 @@ export function useRecording({ config, onTranscriptionComplete, onError }: UseRe
         } catch (error) {
             setRecordingState('idle');
             setDuration(0);
+            // Hide overlay on error
+            const overlay = await getOverlay();
+            if (overlay) await overlay.hide();
             console.error('[Recording] Start failed:', error);
             onError(`Failed to start recording: ${error}`);
         }
@@ -76,6 +117,13 @@ export function useRecording({ config, onTranscriptionComplete, onError }: UseRe
 
         setRecordingState('processing');
         setAudioLevels([]);
+
+        // Show processing status on overlay
+        const overlay = await getOverlay();
+        if (overlay) {
+            await overlay.emit('overlay-update', { status: 'processing' });
+        }
+
 
         try {
             console.log('[Recording] Stopping and saving...');
@@ -167,6 +215,19 @@ export function useRecording({ config, onTranscriptionComplete, onError }: UseRe
                     duration: duration,
                 };
 
+                // Auto-paste if enabled
+                if (config.auto_paste) {
+                    try {
+                        console.log('[AutoPaste] Copying to clipboard and pasting...');
+                        const { writeText } = await import('@tauri-apps/plugin-clipboard-manager');
+                        await writeText(transcription);
+                        await invoke('paste_to_window');
+                        console.log('[AutoPaste] Done');
+                    } catch (pasteErr) {
+                        console.warn('[AutoPaste] Failed:', pasteErr);
+                    }
+                }
+
                 onTranscriptionComplete(result);
 
             } catch (transcriptionError) {
@@ -193,6 +254,12 @@ export function useRecording({ config, onTranscriptionComplete, onError }: UseRe
             console.error('[Recording] Failed to stop/save:', error);
             onError(`Recording failed: ${error}`);
         } finally {
+            // Hide overlay when done
+            const overlay = await getOverlay();
+            if (overlay) {
+                await overlay.emit('overlay-update', { status: 'idle' });
+                await overlay.hide();
+            }
             setRecordingState('idle');
         }
     }, [recordingState, config, duration, onTranscriptionComplete, onError]);
@@ -228,44 +295,53 @@ export function useRecording({ config, onTranscriptionComplete, onError }: UseRe
 
                 console.log('[Shortcut] Attempting to register:', config.shortcut, 'mode:', config.recording_mode);
 
-                // Unregister previous shortcut if it changed
-                if (shortcutRegistered.current && shortcutRegistered.current !== config.shortcut) {
+                // Unregister previous shortcut if it or mode changed
+                const modeChanged = registeredModeRef.current !== null && registeredModeRef.current !== config.recording_mode;
+                const shortcutChanged = shortcutRegistered.current && shortcutRegistered.current !== config.shortcut;
+
+                if (shortcutChanged || modeChanged) {
+                    const toUnregister = shortcutRegistered.current || config.shortcut;
                     try {
-                        await unregister(shortcutRegistered.current);
-                        console.log('[Shortcut] Unregistered previous:', shortcutRegistered.current);
+                        await unregister(toUnregister);
+                        console.log('[Shortcut] Unregistered (mode/shortcut changed):', toUnregister);
                     } catch {
                         // Ignore unregister errors
                     }
                     shortcutRegistered.current = null;
+                    registeredModeRef.current = null;
                 }
 
                 const alreadyRegistered = await isRegistered(config.shortcut);
                 console.log('[Shortcut] Already registered:', alreadyRegistered);
 
                 if (!alreadyRegistered) {
+                    const currentMode = config.recording_mode;
                     await register(config.shortcut, (event) => {
-                        console.log('[Shortcut] Event:', event.state, 'Mode:', config.recording_mode);
+                        console.log('[Shortcut] Event:', event.state, 'Mode:', currentMode, 'State:', recordingStateRef.current);
 
-                        const isHoldMode = config.recording_mode === 'hold';
+                        const isHoldMode = currentMode === 'hold';
 
                         if (event.state === 'Pressed') {
                             if (isHoldMode) {
-                                // Hold mode: always start on press
-                                startRecording();
+                                // Hold mode: always start on press (only if idle)
+                                if (recordingStateRef.current === 'idle') {
+                                    startRecording();
+                                }
                             } else {
                                 // Toggle mode: toggle on press
                                 toggleRecording();
                             }
                         } else if (event.state === 'Released') {
-                            if (isHoldMode) {
-                                // Hold mode: stop on release
+                            if (isHoldMode && recordingStateRef.current === 'recording') {
+                                // Hold mode: stop on release (only if recording)
                                 stopRecording();
                             }
                             // Toggle mode: ignore release
                         }
                     });
                     shortcutRegistered.current = config.shortcut;
-                    console.log('[Shortcut] Successfully registered:', config.shortcut);
+                    registeredModeRef.current = config.recording_mode;
+                    console.log('[Shortcut] Successfully registered:', config.shortcut, 'mode:', config.recording_mode);
                 }
             } catch (error) {
                 console.error('[Shortcut] Failed to register:', error);

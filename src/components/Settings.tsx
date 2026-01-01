@@ -91,11 +91,14 @@ export function Settings({ config, onSave, onClose }: SettingsProps) {
         setKeyValidation(prev => ({ ...prev, [provider]: null }));
 
         try {
-            // Simple validation: try a minimal API call
-            // For now, we just check if the key looks valid (not empty and has reasonable length)
-            const isValid = key.length > 20;
+            // Real validation via backend
+            const isValid = await invoke<boolean>('validate_provider_api_key', {
+                provider,
+                apiKey: key
+            });
             setKeyValidation(prev => ({ ...prev, [provider]: isValid ? 'valid' : 'invalid' }));
-        } catch {
+        } catch (err) {
+            console.error('Validation failed:', err);
             setKeyValidation(prev => ({ ...prev, [provider]: 'invalid' }));
         } finally {
             setValidatingKey(null);

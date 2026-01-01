@@ -202,7 +202,23 @@ async fn format_transcript(
         _ => return Err("Provider does not support formatting".to_string()),
     };
 
-    transcription::format_transcript(&text, provider_enum, &api_key, &model, &system_prompt)
+    let result = transcription::format_transcript(&text, provider_enum, &api_key, &model, &system_prompt)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(result)
+}
+
+#[tauri::command]
+async fn validate_provider_api_key(provider: String, api_key: String) -> Result<bool, String> {
+    let provider_enum = match provider.as_str() {
+        "openai" => transcription::TranscriptionProvider::OpenAI,
+        "groq" => transcription::TranscriptionProvider::Groq,
+        "assemblyai" => transcription::TranscriptionProvider::AssemblyAI,
+        _ => return Err("Unknown provider".to_string()),
+    };
+
+    transcription::validate_api_key(provider_enum, &api_key)
         .await
         .map_err(|e| e.to_string())
 }
@@ -462,6 +478,7 @@ pub fn run() {
             format_transcript,
             paste_to_window,
             extract_audio_from_file,
+            validate_provider_api_key,
             // Secure storage
             store_api_key,
             get_api_key,
@@ -553,6 +570,10 @@ pub fn run() {
                     }
                 });
             }
+
+            // Hide from dock - menu bar only mode
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
             Ok(())
         })
